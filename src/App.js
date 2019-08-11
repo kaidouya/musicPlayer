@@ -122,13 +122,13 @@ const songs = [
 ];
 
 const App = () => {
-
+  let isDrag = false;
   // 變數宣告 - hooks
   const [open, setStateOpen] = useState(true); // 彈窗是否開啟
   const [songIndex, setStateIndex] = useState(0); // 當前歌曲
   const [completed, setCompleted] = useState(0); // 進度條
   const [isFavorite, setIsFavorite] = useState(false) // 設置我的最愛
-  const [isPlay, setIsPlay] = useState(false); // 設置啟動
+  const [isPlay, setIsPlay] = useState(true); // 設置啟動
   const [isRandom, setIsRandom] = useState(false); // 設置隨機
   const [currentTime, setCurrentTime] = useState(0); // 設置當前時間
   const [leftTime, setLeftTime] = useState(0); // 設置以進行時間
@@ -141,31 +141,67 @@ const App = () => {
   // meterial-ui 的樣式變數
   const classes = useStyles();
 
-  // 移動時間條
-  const moveProgress = (event) => {
-    const fullWidth = progressRef.current.clientWidth;
-    const percent = ((event.clientX - 72) / fullWidth * 100).toFixed(2);
-    const { duration } = audioRef.current;
-    audioRef.current.currentTime = duration * percent / 100;
-    setCompleted(percent);
+  // 切換上一首歌
+  const clickPrevious = () => {
+    const newIndex = (songIndex - 1 + songs.length) % songs.length;
+    setStateIndex(newIndex);
   }
+
+  // 切換下一首歌
+  const clickNext = useCallback(() => {
+    let add = 1;
+    if (isRandom) {
+      add = Math.floor(Math.random() * Math.floor(songs.length)) + 1;
+    }
+    const newIndex = (songIndex + add) % songs.length;
+    setStateIndex(newIndex);
+  });
+
+  // 暫停 ＆ 播放紐
+  const onClickIsPlay = () => {
+    if (isPlay) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlay(!isPlay)
+  }
+
+
+  // 手動調整時間條
+  const moveProgress = (event) => {
+    //   const fullWidth = progressRef.current.clientWidth;
+    //   const percent = ((event.clientX - 72) / fullWidth * 100).toFixed(2);
+    //   const { duration } = audioRef.current;
+    //   audioRef.current.currentTime = duration * percent / 100;
+    //   setCompleted(percent);
+  }
+
+  // 畫面重新render的時候執行
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.ontimeupdate = () => {
+        // 抓取下一秒的時間
+        const nextTime = audioRef.current.currentTime.toFixed(0) || null;
+
+        // 整首歌時間  + 歌曲當前的時間解構
+        const { duration, currentTime } = audioRef.current;
+
+        // 進度條隨時間前進
+        setCompleted((preState) => {
+          if (preState === 100) return 0;
+          if (audioRef.current) {
+            return (currentTime / duration * 100).toFixed(2);
+          }
+        });
+      }
+    }
+  });
 
   // 關閉彈窗
   function handleClose() {
     setStateOpen(false);
   }
-
-  // 每當畫面重新render時
-  useEffect((isDrag) => {
-    progressRef.current.onmousemove = (event) => {
-      if (isDrag) moveProgress(event);
-    }
-
-    progressRef.current.onmousedown = (event) => {
-      isDrag = true;
-    }
-  },[clickNext,isDrag]);
-
 
   // 解構歌曲
   const { name, author } = songs[songIndex];
@@ -209,11 +245,35 @@ const App = () => {
         </Box>
 
         {/*  底部進度條 + 控制器  */}
+        {/* <div className={classes.title}>
+          <Typography variant="h5" className={classNames(classes.font, classes.margin)}>{name}</Typography>
+          <Typography variant="subtitle1" className={classNames(classes.font, classes.margin)} >{author}</Typography>
+        </div> */}
+        <Box className={classes.playerBar}>
+          <Box className={classes.coverDiv}>
+            <img style={{ width: '100%', height: '100%' }} src={`./cover/${name}.jpg`} alt="albumcover" />
+          </Box>
+          <Box className={classes.tools}>
+            <IconButton aria-label="skip_previous" className={classes.margin} onClick={clickPrevious}>
+              <SkipPrevious color="primary" fontSize="small" />
+            </IconButton>
+            <Fab aria-label="play" color="secondary" className={classes.margin} onClick={onClickIsPlay}>
+              {!isPlay ? <PlayArrow color="primary" fontSize="large" /> : <Pause color="primary" fontSize="large" />}
+            </Fab>
+            <IconButton aria-label="skip_next" className={classes.margin} onClick={clickNext}>
+              <SkipNext color="primary" fontSize="small" />
+            </IconButton>
+            <IconButton aria-label="volume" className={classes.margin} onClick={() => setIsMute(!isMute)}>
+              {!isMute ? <VolumeUp color="primary" fontSize="small" /> : <VolumeOff color="primary" fontSize="small" />}
+            </IconButton>
+          </Box>
+        </Box>
         <Box className={classes.porgressArea}>
           <Box>
             <audio
               autoPlay
               ref={audioRef}
+              // muted={isMute}
               muted={isMute}
               src={`./music/${name}.mp3`}>
             </audio>
